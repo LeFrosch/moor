@@ -3,6 +3,7 @@ import 'dart:math' show max;
 import 'package:drift_dev/moor_generator.dart';
 import 'package:drift_dev/src/analyzer/options.dart';
 import 'package:drift_dev/src/analyzer/sql_queries/explicit_alias_transformer.dart';
+import 'package:drift_dev/src/analyzer/sql_queries/nested_query_transformer.dart';
 import 'package:drift_dev/src/utils/string_escaper.dart';
 import 'package:drift_dev/writer.dart';
 import 'package:recase/recase.dart';
@@ -44,8 +45,8 @@ class QueryWriter {
     // We do this transformation so late because it shouldn't have an impact on
     // analysis, Dart getter names stay the same.
     if (resultSet != null && options.newSqlCodeGeneration) {
-      _transformer = ExplicitAliasTransformer();
-      _transformer.rewrite(query.root!);
+      ExplicitAliasTransformer().rewrite(query.root!);
+      NestedQueryTransformer().rewrite(query.root!);
     }
 
     if (query is SqlSelectQuery) {
@@ -110,7 +111,11 @@ class QueryWriter {
         _buffer.write('})');
       }
     } else {
-      _buffer.write('(QueryRow row) async { return ${query.resultClassName}(');
+      _buffer.write('(QueryRow row) ');
+      if (query is SqlSelectQuery && query.hasNestedQuery) {
+        _buffer.write('async ');
+      }
+      _buffer.write('{ return ${query.resultClassName}(');
 
       if (options.rawResultSetData) {
         _buffer.write('row: row,\n');
@@ -210,7 +215,11 @@ class QueryWriter {
     _buffer.write(', ');
     _writeReadsFrom(select);
 
-    _buffer.write(').map(');
+    if (select.hasNestedQuery) {
+      _buffer.write(').asyncMap(');
+    } else {
+      _buffer.write(').map(');
+    }
     _writeMappingLambda(select);
     _buffer.write(')');
   }
@@ -309,7 +318,9 @@ class QueryWriter {
     }
 
     var needsComma = false;
-    for (final element in query.elements) {
+    for (final element in query.elementsWithNestedQueries()) {
+      if (element.hidden) continue;
+
       // Placeholders with a default value generate optional (and thus, named)
       // parameters. Since moor 4, we have an option to also generate named
       // parameters for named variables.
@@ -860,6 +871,8 @@ class _ExpandedVariableWriter {
         if (needsNullAssertion) {
           buffer.write('!');
         }
+      } else if (element.nestedQuery) {
+        buffer.write('row.read(\'${query.name}_$dartExpr\')');
       } else {
         buffer.write(dartExpr);
       }

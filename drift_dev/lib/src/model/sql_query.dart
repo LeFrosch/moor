@@ -158,6 +158,28 @@ abstract class SqlQuery {
 
     return resultClassName;
   }
+
+  /// Returns all found elements, from this query an all nested queries. The
+  /// elements returned by this method are in no particular order, thus they
+  /// can only be used to determine the method parameters.
+  ///
+  /// This method makes some effort to remove duplicated parameters. But only
+  /// by comparing the dart name.
+  List<FoundElement> elementsWithNestedQueries() {
+    final elements = List.of(this.elements);
+
+    final subQueries = resultSet?.nestedResults.whereType<NestedResultQuery>();
+    for (final subQuery in subQueries ?? const <NestedResultQuery>[]) {
+      for (final subElement in subQuery.query.elementsWithNestedQueries()) {
+        if (elements
+            .none((e) => e.dartParameterName == subElement.dartParameterName)) {
+          elements.add(subElement);
+        }
+      }
+    }
+
+    return elements;
+  }
 }
 
 class SqlSelectQuery extends SqlQuery {
@@ -172,6 +194,10 @@ class SqlSelectQuery extends SqlQuery {
   /// The name of the result class, as requested by the user.
   // todo: Allow custom result classes for RETURNING as well?
   final String? requestedResultClass;
+
+  /// Whether this query contains nested queries or not
+  bool get hasNestedQuery =>
+      resultSet.nestedResults.any((e) => e is NestedResultQuery);
 
   SqlSelectQuery(
     String name,
@@ -517,14 +543,13 @@ class NestedResultQuery extends NestedResult {
     }
   }
 
-  // Every query should be unique.
+  // Because it is currently not possible to reuse result classes from queries
+  // that use nested queries, every instance should be different. Therefore
+  // the object hashCode and equality operator is just fine.
 
-  /// [hashCode] that matches [isCompatibleTo] instead of `==`.
   @override
   int get compatibilityHashCode => hashCode;
 
-  /// Checks whether this is compatible to the [other] nested result, which is
-  /// the case iff they have the same and read from the same table.
   @override
   bool isCompatibleTo(NestedResult other) => this == other;
 }
@@ -538,6 +563,9 @@ abstract class FoundElement {
   String? get name;
 
   bool get hasSqlName => name != null;
+
+  /// If the element should be hidden from the parameter list
+  bool get hidden => false;
 
   /// Dart code for a type representing tis element.
   String dartTypeCode([GenerationOptions options = const GenerationOptions()]);
@@ -581,6 +609,12 @@ class FoundVariable extends FoundElement implements HasType {
 
   final bool isRequired;
 
+  @override
+  final bool hidden;
+
+  /// Whether this variable is used as input for a nested query or not.
+  final bool nestedQuery;
+
   FoundVariable({
     required this.index,
     required this.name,
@@ -590,7 +624,21 @@ class FoundVariable extends FoundElement implements HasType {
     this.isArray = false,
     this.isRequired = false,
     this.typeConverter,
-  }) : assert(variable.resolvedIndex == index);
+  })  : hidden = false,
+        nestedQuery = false,
+        assert(variable.resolvedIndex == index);
+
+  FoundVariable.nestedQuery({
+    required this.index,
+    required this.name,
+    required this.type,
+    required this.variable,
+  })  : typeConverter = null,
+        nullable = false,
+        isArray = false,
+        isRequired = true,
+        nestedQuery = true,
+        hidden = true;
 
   @override
   String get dartParameterName {
