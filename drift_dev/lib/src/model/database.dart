@@ -72,6 +72,9 @@ class Database extends BaseMoorAccessor {
 
 /// A dao, declared via an `UseDao` annotation on a Dart class.
 class Dao extends BaseMoorAccessor {
+  final List<String> astTables;
+  final List<String> astViews;
+
   /// The database class this dao belongs to.
   final DartType dbClass;
 
@@ -82,6 +85,8 @@ class Dao extends BaseMoorAccessor {
     List<MoorView> declaredViews = const [],
     required List<String> declaredIncludes,
     required List<DeclaredQuery> declaredQueries,
+    this.astTables = const [],
+    this.astViews = const [],
   }) : super._(declaration, declaredTables, declaredViews, declaredIncludes,
             declaredQueries);
 }

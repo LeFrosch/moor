@@ -1,4 +1,6 @@
+import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
@@ -20,9 +22,9 @@ import '../custom_row_class.dart';
 
 part 'column_parser.dart';
 part 'table_parser.dart';
-part 'view_parser.dart';
 part 'use_dao_parser.dart';
 part 'use_moor_parser.dart';
+part 'view_parser.dart';
 
 class MoorDartParser {
   final ParseDartStep step;

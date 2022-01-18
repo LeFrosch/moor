@@ -2,6 +2,7 @@ import 'package:build/build.dart';
 import 'package:drift_dev/src/backends/build/moor_builder.dart';
 import 'package:drift_dev/src/utils/type_utils.dart';
 import 'package:drift_dev/writer.dart';
+import 'package:recase/recase.dart';
 import 'package:source_gen/source_gen.dart';
 
 class DaoGenerator extends Generator implements BaseGenerator {
@@ -27,6 +28,13 @@ class DaoGenerator extends Generator implements BaseGenerator {
       for (final table in dao.tables) {
         final infoType = table.entityInfoName;
         final getterName = table.dbGetterName;
+        classScope.leaf().write(
+            '$infoType get $getterName => attachedDatabase.$getterName;\n');
+      }
+
+      for (final table in dao.astTables) {
+        final infoType = table;
+        final getterName = ReCase(table).camelCase;
         classScope.leaf().write(
             '$infoType get $getterName => attachedDatabase.$getterName;\n');
       }
